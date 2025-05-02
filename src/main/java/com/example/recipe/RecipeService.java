@@ -21,7 +21,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 @Service
 class RecipeService {
@@ -51,7 +50,7 @@ class RecipeService {
         this.chatClient = chatClient;
         this.imageModel = imageModel;
         this.vectorStore = vectorStore;
-    }
+	}
 
     void addRecipeDocumentForRag(Resource pdfResource, int pageTopMargin, int pageBottomMargin) {
         log.info("Add recipe document {} for rag", pdfResource.getFilename());
@@ -77,9 +76,11 @@ class RecipeService {
         }
 
         if (imageModel.isPresent()) {
-            var imagePromptTemplate = new PromptTemplate(imageForRecipePromptResource);
-            var imagePromptInstructions = imagePromptTemplate.render(Map.of("recipe", recipe.name(), "ingredients", String.join(",", recipe.ingredients())));
-            var imageGeneration = imageModel.get().call(new ImagePrompt(imagePromptInstructions)).getResult();
+            var imagePromptTemplate = PromptTemplate.builder()
+                    .resource(imageForRecipePromptResource)
+                    .variables(Map.of("recipe", recipe.name(), "ingredients", String.join(",", recipe.ingredients())))
+                    .build();
+            var imageGeneration = imageModel.get().call(new ImagePrompt(imagePromptTemplate.render())).getResult();
             return new Recipe(recipe, imageGeneration.getOutput().getUrl());
         }
         return recipe;
@@ -116,29 +117,31 @@ class RecipeService {
 
     private Recipe fetchRecipeWithRagFor(List<String> ingredients) {
         log.info("Fetch recipe with additional information from vector store");
-        var promptTemplate = new PromptTemplate(recipeForIngredientsPromptResource,
-                Map.of("ingredients", String.join(",", ingredients)));
-        var advise = new PromptTemplate(preferOwnRecipePromptResource).getTemplate();
-        var advisorSearchRequest = SearchRequest.builder().topK(2).similarityThreshold(0.7).build();
+        var ragPromptTemplate = PromptTemplate.builder().resource(preferOwnRecipePromptResource).build();
+        var ragSearchRequest = SearchRequest.builder().topK(2).similarityThreshold(0.7).build();
+        var ragAdvisor = QuestionAnswerAdvisor.builder(vectorStore).searchRequest(ragSearchRequest).promptTemplate(ragPromptTemplate).build();
 
-        return chatClient.prompt()
-                .user(promptTemplate.render())
-                .advisors(new QuestionAnswerAdvisor(vectorStore, advisorSearchRequest, advise))
-                .call()
-                .entity(Recipe.class);
+         return chatClient.prompt()
+                 .user(us -> us
+                        .text(recipeForAvailableIngredientsPromptResource)
+                        .param("ingredients", String.join(",", ingredients)))
+                 .advisors(ragAdvisor)
+                 .call()
+                 .entity(Recipe.class);
     }
 
     private Recipe fetchRecipeWithRagAndFunctionCallingFor(List<String> ingredients) {
         log.info("Fetch recipe with additional information from vector store and function calling");
-        var promptTemplate = new PromptTemplate(recipeForAvailableIngredientsPromptResource,
-                Map.of("ingredients", String.join(",", ingredients)));
-        var advise = new PromptTemplate(preferOwnRecipePromptResource).getTemplate();
-        var advisorSearchRequest = SearchRequest.builder().topK(2).similarityThreshold(0.7).build();
+        var ragPromptTemplate = PromptTemplate.builder().resource(preferOwnRecipePromptResource).build();
+        var ragSearchRequest = SearchRequest.builder().topK(2).similarityThreshold(0.7).build();
+        var ragAdvisor = QuestionAnswerAdvisor.builder(vectorStore).searchRequest(ragSearchRequest).promptTemplate(ragPromptTemplate).build();
 
         return chatClient.prompt()
-                .user(promptTemplate.render())
+                .user(us -> us
+                        .text(recipeForAvailableIngredientsPromptResource)
+                        .param("ingredients", String.join(",", ingredients)))
                 .tools(this)
-                .advisors(new QuestionAnswerAdvisor(vectorStore, advisorSearchRequest, advise), new SimpleLoggerAdvisor())
+                .advisors(ragAdvisor, new SimpleLoggerAdvisor())
                 .call()
                 .entity(Recipe.class);
     }
