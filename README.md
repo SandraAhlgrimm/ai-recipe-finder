@@ -55,7 +55,7 @@ export SPRING_PROFILES_ACTIVE=azure
 ```
 
 ### Vector DB
-On your local machine, a Redis database is automatically started and configured with docker compose. On your local machine, a Redis database is automatically started and configured with Docker Compose for the favorite-recipes-server. As a fallback if no Redis database is configured, a SimpleVectorStore instance will be used.
+On your local machine, a Redis database is automatically started and configured with docker compose. As a fallback if no Redis database is configured, a SimpleVectorStore instance will be used.
 
 # Running the application locally
 ```
