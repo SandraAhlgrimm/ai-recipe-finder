@@ -3,7 +3,6 @@ package com.example.recipe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.image.ImageModel;
@@ -141,7 +140,7 @@ class RecipeService {
                         .text(recipeForAvailableIngredientsPromptResource)
                         .param("ingredients", String.join(",", ingredients)))
                 .tools(this)
-                .advisors(ragAdvisor, new SimpleLoggerAdvisor())
+                .advisors(ragAdvisor)
                 .call()
                 .entity(Recipe.class);
     }

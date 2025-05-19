@@ -1,7 +1,13 @@
-If one of the following recipes includes those ingredients, provide one of these recipes unchanged!
-Remove any text formatting like uppercase.
+{query}
 
-Recipes: """
+Context information is below.
+
+---------------------
 {question_answer_context}
-"""
+---------------------
 
+Given the context information and no prior knowledge, answer the query.
+
+Follow these rules:
+1. If there are recipes in the context, return the first of these recipes unchanged.
+2. Otherwise, answer the query by generating a recipe.

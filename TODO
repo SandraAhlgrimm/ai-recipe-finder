@@ -1,1 +1,1 @@
-- Prevent prompt injection attacks
+- Improve RAG prompt to generate recipe if there is no matching document
