@@ -1,6 +1,7 @@
 spring:
   application.name: RecipeFinder
   ai:
+    # Define AI provider(s) for type of models for autoconfiguration
     model:
       chat: ollama
       embedding: ollama
@@ -9,6 +10,7 @@ spring:
         speech: none
         transcription: none
       moderation: none
+    # AI provider configuration
     ollama:
       chat:
         model: llama3.2
@@ -30,6 +32,7 @@ spring:
     max-request-size: 100MB
 server.tomcat.max-swallow-size: -1
 
+# VectorStore configuration
 spring.data.redis:
   host: localhost
   port: 6379

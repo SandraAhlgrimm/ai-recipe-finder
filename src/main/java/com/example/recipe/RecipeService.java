@@ -13,7 +13,6 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -52,14 +51,18 @@ class RecipeService {
         this.vectorStore = vectorStore;
 	}
 
+    // ETL pipeline orchestrating the flow from raw data sources to a structured vector store
     void addRecipeDocumentForRag(Resource pdfResource, int pageTopMargin, int pageBottomMargin) {
         log.info("Add recipe document {} for rag", pdfResource.getFilename());
         var documentReaderConfig = PdfDocumentReaderConfig.builder()
                 .withPageTopMargin(pageTopMargin)
                 .withPageBottomMargin(pageBottomMargin)
                 .build();
+        // Extract: Parses PDF documents
         var documentReader = new PagePdfDocumentReader(pdfResource, documentReaderConfig);
+        // Transform: Splits text into chunks based on defined token count
         var documents = new TokenTextSplitter().apply(documentReader.get());
+        // Loads data into vector database
         vectorStore.accept(documents);
     }
 
@@ -76,6 +79,7 @@ class RecipeService {
         }
 
         if (imageModel.isPresent()) {
+            // Only low-level API available for image models
             var imagePromptTemplate = PromptTemplate.builder()
                     .resource(imageForRecipePromptResource)
                     .variables(Map.of("recipe", recipe.name()))
@@ -95,6 +99,7 @@ class RecipeService {
                         .text(recipeForIngredientsPromptResource)
                         .param("ingredients", String.join(",", ingredients)))
                 .call()
+                 // Enables structured output parsing
                 .entity(Recipe.class);
     }
 
@@ -105,11 +110,13 @@ class RecipeService {
                 .user(us -> us
                         .text(recipeForAvailableIngredientsPromptResource)
                         .param("ingredients", String.join(",", ingredients)))
+                // Provides tools (methods annotated with @Tool) from this object
                 .tools(this)
                 .call()
                 .entity(Recipe.class);
     }
 
+    // Defines a tool
     @Tool(description = "Fetches ingredients that are available at home")
     List<String> fetchIngredientsAvailableAtHome() {
         log.info("Fetching ingredients available at home tool called by LLM");
@@ -118,6 +125,7 @@ class RecipeService {
 
     private Recipe fetchRecipeWithRagFor(List<String> ingredients) {
         log.info("Fetch recipe with additional information from vector store");
+        // Configures the advisor implementing RAG
         var ragPromptTemplate = PromptTemplate.builder().resource(preferOwnRecipePromptResource).build();
         var ragSearchRequest = SearchRequest.builder().topK(2).similarityThreshold(0.7).build();
         var ragAdvisor = QuestionAnswerAdvisor.builder(vectorStore).searchRequest(ragSearchRequest).promptTemplate(ragPromptTemplate).build();
@@ -126,6 +134,7 @@ class RecipeService {
                  .user(us -> us
                         .text(recipeForAvailableIngredientsPromptResource)
                         .param("ingredients", String.join(",", ingredients)))
+                 // Registers the advisor implementing RAG for chat model interaction
                  .advisors(ragAdvisor)
                  .call()
                  .entity(Recipe.class);

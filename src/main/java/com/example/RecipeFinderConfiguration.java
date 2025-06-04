@@ -16,14 +16,14 @@ class RecipeFinderConfiguration {
     @Value("classpath:/prompts/fix-json-response")
     private Resource fixJsonResponsePromptResource;
 
+    @Bean
+    ChatClient chatClient(ChatClient.Builder chatClientBuilder) {
+        return chatClientBuilder.defaultSystem(fixJsonResponsePromptResource).build();
+    }
+
     @ConditionalOnMissingBean(VectorStore.class)
     @Bean
     VectorStore simpleVectorStore(EmbeddingModel embeddingModel) {
         return SimpleVectorStore.builder(embeddingModel).build();
-    }
-
-    @Bean
-    ChatClient chatClient(ChatClient.Builder chatClientBuilder) {
-        return chatClientBuilder.defaultSystem(fixJsonResponsePromptResource).build();
     }
 }

@@ -1,9 +1,11 @@
 spring:
   ai:
+    # Define AI provider(s) for type of models for autoconfiguration
     model:
       chat: azure-openai
       embedding: azure-openai
       image: azure-openai
+    # AI provider configuration
     azure.openai:
       chat:
         options:
