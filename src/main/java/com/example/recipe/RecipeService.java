@@ -13,6 +13,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -67,19 +68,20 @@ class RecipeService {
         if (!preferAvailableIngredients && !preferOwnRecipes) {
             recipe = fetchRecipeFor(ingredients);
         } else if (preferAvailableIngredients && !preferOwnRecipes) {
-            recipe = fetchRecipeWithFunctionCallingFor(ingredients);
+            recipe = fetchRecipeWithToolCallingFor(ingredients);
         } else if (!preferAvailableIngredients && preferOwnRecipes) {
             recipe = fetchRecipeWithRagFor(ingredients);
         } else {
-            recipe = fetchRecipeWithRagAndFunctionCallingFor(ingredients);
+            recipe = fetchRecipeWithRagAndToolCallingFor(ingredients);
         }
 
         if (imageModel.isPresent()) {
             var imagePromptTemplate = PromptTemplate.builder()
                     .resource(imageForRecipePromptResource)
-                    .variables(Map.of("recipe", recipe.name(), "ingredients", String.join(",", recipe.ingredients())))
+                    .variables(Map.of("recipe", recipe.name()))
                     .build();
-            var imageGeneration = imageModel.get().call(new ImagePrompt(imagePromptTemplate.render())).getResult();
+            var imagePrompt = new ImagePrompt(imagePromptTemplate.render());
+            var imageGeneration = imageModel.get().call(imagePrompt).getResult();
             return new Recipe(recipe, imageGeneration.getOutput().getUrl());
         }
         return recipe;
@@ -96,8 +98,8 @@ class RecipeService {
                 .entity(Recipe.class);
     }
 
-    private Recipe fetchRecipeWithFunctionCallingFor(List<String> ingredients) {
-        log.info("Fetch recipe with additional information from function calling");
+    private Recipe fetchRecipeWithToolCallingFor(List<String> ingredients) {
+        log.info("Fetch recipe with additional information from tool calling");
 
         return chatClient.prompt()
                 .user(us -> us
@@ -110,7 +112,7 @@ class RecipeService {
 
     @Tool(description = "Fetches ingredients that are available at home")
     List<String> fetchIngredientsAvailableAtHome() {
-        log.info("Fetching ingredients available at home function called by LLM");
+        log.info("Fetching ingredients available at home tool called by LLM");
         return availableIngredientsInFridge;
     }
 
@@ -129,8 +131,8 @@ class RecipeService {
                  .entity(Recipe.class);
     }
 
-    private Recipe fetchRecipeWithRagAndFunctionCallingFor(List<String> ingredients) {
-        log.info("Fetch recipe with additional information from vector store and function calling");
+    private Recipe fetchRecipeWithRagAndToolCallingFor(List<String> ingredients) {
+        log.info("Fetch recipe with additional information from vector store and tool calling");
         var ragPromptTemplate = PromptTemplate.builder().resource(preferOwnRecipePromptResource).build();
         var ragSearchRequest = SearchRequest.builder().topK(2).similarityThreshold(0.7).build();
         var ragAdvisor = QuestionAnswerAdvisor.builder(vectorStore).searchRequest(ragSearchRequest).promptTemplate(ragPromptTemplate).build();
